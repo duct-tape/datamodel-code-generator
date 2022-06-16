@@ -537,9 +537,19 @@ def main(args: Optional[Sequence[str]] = None) -> Exit:
             )
             return Exit.ERROR
 
+    main_input = config.url or config.input
+    if not main_input:
+        if not sys.__stdin__.isatty():
+            try:
+                with sys.stdin as sys_input:
+                    main_input = sys_input.read()
+            except AttributeError:
+                # AttributeError raised in tests.
+                raise SystemExit()
+
     try:
         generate(
-            input_=config.url or config.input or sys.stdin.read(),
+            input_=main_input,
             input_file_type=config.input_file_type,
             output=config.output,
             target_python_version=config.target_python_version,

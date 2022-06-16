@@ -1,8 +1,9 @@
+import io
 import platform
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import call
+from unittest.mock import call, patch as mock_patch, MagicMock
 
 import isort
 import pydantic
@@ -28,6 +29,21 @@ CSV_DATA_PATH: Path = DATA_PATH / 'csv'
 EXPECTED_MAIN_PATH = DATA_PATH / 'expected' / 'main'
 
 TIMESTAMP = '1985-10-26T01:21:00-07:00'
+
+
+def mock_stdin(filename):
+    """Read file and return io.StringIO instance suitable for mocking stdin.
+
+    Args:
+        filename (pathlib.Path): Path to file to be read.
+
+    Returns: io.StringIO instance with file contentes.
+    """
+    input_data = filename.read_text().encode(
+        'utf8',
+        'backslashreplace'
+    ).decode('utf8')
+    return mock_patch("sys.stdin", io.StringIO(input_data))
 
 
 @freeze_time('2019-07-26')
@@ -386,8 +402,6 @@ def test_main_json_arrary_include_null():
                 EXPECTED_MAIN_PATH / 'main_json_array_include_null' / 'output.py'
             ).read_text()
         )
-    with pytest.raises(SystemExit):
-        main()
 
 
 @freeze_time('2019-07-26')
@@ -1318,18 +1332,19 @@ def test_main_jsonschema_id():
 
 
 @freeze_time('2019-07-26')
-def test_main_jsonschema_id_as_stdin(monkeypatch):
+def test_main_jsonschema_id_as_stdin():
     with TemporaryDirectory() as output_dir:
         output_file: Path = Path(output_dir) / 'output.py'
-        monkeypatch.setattr('sys.stdin', (JSON_SCHEMA_DATA_PATH / 'id.json').open())
-        return_code: Exit = main(
-            [
-                '--output',
-                str(output_file),
-                '--input-file-type',
-                'jsonschema',
-            ]
-        )
+
+        with mock_stdin(JSON_SCHEMA_DATA_PATH / 'id.json'):
+            return_code: Exit = main(
+                [
+                    '--output',
+                    str(output_file),
+                    '--input-file-type',
+                    'jsonschema',
+                ]
+            )
         assert return_code == Exit.OK
         assert (
             output_file.read_text()
@@ -1759,18 +1774,18 @@ def test_csv_file():
 
 
 @freeze_time('2019-07-26')
-def test_csv_stdin(monkeypatch):
+def test_csv_stdin():
     with TemporaryDirectory() as output_dir:
         output_file: Path = Path(output_dir) / 'output.py'
-        monkeypatch.setattr('sys.stdin', (CSV_DATA_PATH / 'simple.csv').open())
-        return_code: Exit = main(
-            [
-                '--output',
-                str(output_file),
-                '--input-file-type',
-                'csv',
-            ]
-        )
+        with mock_stdin(CSV_DATA_PATH / 'simple.csv'):
+            return_code: Exit = main(
+                [
+                    '--output',
+                    str(output_file),
+                    '--input-file-type',
+                    'csv',
+                ]
+            )
         assert return_code == Exit.OK
         assert (
             output_file.read_text()
